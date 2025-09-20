@@ -4,74 +4,120 @@ import pdfplumber
 import re
 from io import BytesIO
 
-# 🔹 Rules for categorizing transactions
+# 🔹 Classification rules
 HEAD_RULES = {
-    "CASH": ["ATM", "CASH", "CASA"],
+    "CASH": ["ATM", "CASH", "CSH", "CASA"],
     "Withdrawal": ["UPI", "IMPS", "NEFT", "TRANSFER", "WITHDRAWAL", "DEBIT"],
     "Interest": ["INT", "INTEREST", "CR INT"],
     "Charge": ["CHRG", "CHARGE", "FEE", "GST", "PENALTY"],
 }
 
-def classify_transaction(description: str) -> str:
-    """Return category based on description keywords"""
-    description = description.upper()
+# 🔹 Bank-specific header mappings
+HEADER_ALIASES = {
+    "date": ["date", "txn date", "transaction date", "value date", "tran date"],
+    "particulars": [
+        "particulars",
+        "description",
+        "narration",
+        "transaction particulars",
+        "details",
+        "remarks"
+    ],
+    "debit": [
+        "debit",
+        "withdrawal amt.",
+        "withdrawal",
+        "debit amount",
+        "dr"
+    ],
+    "credit": [
+        "credit",
+        "deposit amt.",
+        "deposit",
+        "credit amount",
+        "cr"
+    ],
+    "balance": [
+        "balance",
+        "running balance",
+        "closing balance",
+        "bal"
+    ]
+}
+
+def normalize_header(header: str):
+    """Map a header to a standard name (date, particulars, debit, credit, balance)."""
+    header = header.strip().lower()
+    for std, aliases in HEADER_ALIASES.items():
+        if any(header.startswith(a) or a in header for a in aliases):
+            return std
+    return header
+
+def classify_transaction(particulars: str) -> str:
+    """Classify transaction based on Particulars/Description"""
+    particulars = (particulars or "").upper()
     for head, keywords in HEAD_RULES.items():
-        if any(k in description for k in keywords):
+        if any(k in particulars for k in keywords):
             return head
     return "Other"
 
 def process_file(file_bytes, filename):
     """
-    Extract metadata + transactions from a text-based PDF
+    Extract metadata + transactions from PDF bank statements
+    Supports SBI, HDFC, ICICI, Axis, Sutex Cooperative Bank
     """
     meta = {"account_number": None, "name": None, "bank": None}
     transactions = []
 
-    # ✅ Fix: wrap bytes in BytesIO so pdfplumber can read it
     with pdfplumber.open(BytesIO(file_bytes)) as pdf:
-        text = ""
         for page in pdf.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text + "\n"
+            try:
+                table = page.extract_table()
+                if not table:
+                    continue
 
-    # 🔹 Try to extract account details
-    acc_match = re.search(r"Account\s*No[:\- ]+(\d+)", text, re.I)
-    name_match = re.search(r"Name[:\- ]+([A-Za-z ]+)", text, re.I)
-    bank_match = re.search(r"(HDFC|SBI|ICICI|AXIS|KOTAK|PNB|BANK OF BARODA)", text, re.I)
+                # Normalize headers
+                headers = [normalize_header(h or "") for h in table[0]]
+                for row in table[1:]:
+                    row_dict = dict(zip(headers, row))
 
-    if acc_match:
-        meta["account_number"] = acc_match.group(1)
-    if name_match:
-        meta["name"] = name_match.group(1).strip()
-    if bank_match:
-        meta["bank"] = bank_match.group(1)
+                    date = row_dict.get("date")
+                    particulars = row_dict.get("particulars")
+                    debit = row_dict.get("debit")
+                    credit = row_dict.get("credit")
+                    balance = row_dict.get("balance")
 
-    # 🔹 Extract transactions (simple parsing)
-    lines = text.splitlines()
-    for line in lines:
-        parts = line.strip().split()
-        if len(parts) < 3:
-            continue
+                    if not (date and particulars):
+                        continue
 
-        # Assume format: DATE DESCRIPTION AMOUNT BALANCE
-        date = parts[0]
-        if not re.match(r"\d{2}[-/]\d{2}[-/]\d{2,4}", date):
-            continue  # not a transaction line
+                    # Parse amount
+                    amount = None
+                    if debit:
+                        try:
+                            amount = -float(debit.replace(",", ""))
+                        except:
+                            pass
+                    elif credit:
+                        try:
+                            amount = float(credit.replace(",", ""))
+                        except:
+                            pass
 
-        description = " ".join(parts[1:-2])
-        try:
-            amount = float(parts[-2].replace(",", ""))
-        except:
-            continue
+                    if amount is None:
+                        continue
 
-        head = classify_transaction(description)
+                    head = classify_transaction(particulars)
 
-        transactions.append({
-            "Date": date,
-            "Description": description,
-            "Amount": amount,
-            "Head": head
-        })
+                    transactions.append({
+                        "Date": date.strip(),
+                        "Particulars": particulars.strip(),
+                        "Amount": amount,
+                        "Head": head,
+                        "Balance": balance.strip() if balance else None
+                    })
+
+            except Exception as e:
+                print("Error extracting table:", e)
+                continue
 
     return meta, transactions
