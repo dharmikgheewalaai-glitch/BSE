@@ -14,8 +14,8 @@ def clean_date(value):
         return None
     text = str(value).strip().replace("'", "").replace('"', "")
 
-    # Find first dd/mm/yyyy or dd-mm-yyyy or dd.mm.yyyy
-    match = re.search(r"(\d{1,2})[/-\.](\d{1,2})[/-\.](\d{2,4})", text)
+    # ✅ Fix: regex supports /, -, or . as separators
+    match = re.search(r"(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})", text)
     if match:
         day, month, year = match.groups()
         if len(year) == 2:  # handle yy format like 24 → 2024
@@ -62,4 +62,3 @@ if uploaded_file is not None:
             file_name=csv_filename,
             mime="text/csv"
         )
-
