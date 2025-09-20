@@ -1,7 +1,6 @@
 # extractor.py
 
 import pdfplumber
-import re
 from io import BytesIO
 
 # 🔹 Classification rules
@@ -12,7 +11,7 @@ HEAD_RULES = {
     "Charge": ["CHRG", "CHARGE", "FEE", "GST", "PENALTY"],
 }
 
-# 🔹 Bank-specific header mappings
+# 🔹 Bank-specific header mappings (SBI, HDFC, ICICI, Axis, Sutex Cooperative Bank)
 HEADER_ALIASES = {
     "date": ["date", "txn date", "transaction date", "value date", "tran date"],
     "particulars": [
@@ -90,28 +89,24 @@ def process_file(file_bytes, filename):
                     if not (date and particulars):
                         continue
 
-                    # Parse amount
-                    amount = None
-                    if debit:
-                        try:
-                            amount = -float(debit.replace(",", ""))
-                        except:
-                            pass
-                    elif credit:
-                        try:
-                            amount = float(credit.replace(",", ""))
-                        except:
-                            pass
+                    # Clean amounts
+                    try:
+                        debit_amt = float(debit.replace(",", "")) if debit else None
+                    except:
+                        debit_amt = None
 
-                    if amount is None:
-                        continue
+                    try:
+                        credit_amt = float(credit.replace(",", "")) if credit else None
+                    except:
+                        credit_amt = None
 
                     head = classify_transaction(particulars)
 
                     transactions.append({
                         "Date": date.strip(),
                         "Particulars": particulars.strip(),
-                        "Amount": amount,
+                        "Debit": debit_amt,
+                        "Credit": credit_amt,
                         "Head": head,
                         "Balance": balance.strip() if balance else None
                     })
@@ -121,3 +116,4 @@ def process_file(file_bytes, filename):
                 continue
 
     return meta, transactions
+
