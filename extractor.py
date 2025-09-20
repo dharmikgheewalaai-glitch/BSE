@@ -2,6 +2,7 @@
 
 import pdfplumber
 import re
+from io import BytesIO
 
 # 🔹 Rules for categorizing transactions
 HEAD_RULES = {
@@ -26,10 +27,13 @@ def process_file(file_bytes, filename):
     meta = {"account_number": None, "name": None, "bank": None}
     transactions = []
 
-    with pdfplumber.open(file_bytes) as pdf:
+    # ✅ Fix: wrap bytes in BytesIO so pdfplumber can read it
+    with pdfplumber.open(BytesIO(file_bytes)) as pdf:
         text = ""
         for page in pdf.pages:
-            text += page.extract_text() + "\n"
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
 
     # 🔹 Try to extract account details
     acc_match = re.search(r"Account\s*No[:\- ]+(\d+)", text, re.I)
@@ -43,7 +47,7 @@ def process_file(file_bytes, filename):
     if bank_match:
         meta["bank"] = bank_match.group(1)
 
-    # 🔹 Extract transactions (very generic format)
+    # 🔹 Extract transactions (simple parsing)
     lines = text.splitlines()
     for line in lines:
         parts = line.strip().split()
