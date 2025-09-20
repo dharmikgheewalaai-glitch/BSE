@@ -46,7 +46,7 @@ HEADER_ALIASES = {
 
 def normalize_header(header: str):
     """Map a header to a standard name (date, particulars, debit, credit, balance)."""
-    header = header.strip().lower()
+    header = (header or "").strip().lower()
     for std, aliases in HEADER_ALIASES.items():
         if any(header.startswith(a) or a in header for a in aliases):
             return std
@@ -64,6 +64,7 @@ def process_file(file_bytes, filename):
     """
     Extract metadata + transactions from PDF bank statements
     Supports SBI, HDFC, ICICI, Axis, Sutex Cooperative Bank
+    Reads ALL pages & ALL tables
     """
     meta = {"account_number": None, "name": None, "bank": None}
     transactions = []
@@ -71,49 +72,51 @@ def process_file(file_bytes, filename):
     with pdfplumber.open(BytesIO(file_bytes)) as pdf:
         for page in pdf.pages:
             try:
-                table = page.extract_table()
-                if not table:
-                    continue
-
-                # Normalize headers
-                headers = [normalize_header(h or "") for h in table[0]]
-                for row in table[1:]:
-                    row_dict = dict(zip(headers, row))
-
-                    date = row_dict.get("date")
-                    particulars = row_dict.get("particulars")
-                    debit = row_dict.get("debit")
-                    credit = row_dict.get("credit")
-                    balance = row_dict.get("balance")
-
-                    if not (date and particulars):
+                # 🔹 Extract all tables from each page
+                tables = page.extract_tables()
+                for table in tables:
+                    if not table or len(table) < 2:
                         continue
 
-                    # Clean amounts
-                    try:
-                        debit_amt = float(debit.replace(",", "")) if debit else None
-                    except:
-                        debit_amt = None
+                    # Normalize headers
+                    headers = [normalize_header(h or "") for h in table[0]]
 
-                    try:
-                        credit_amt = float(credit.replace(",", "")) if credit else None
-                    except:
-                        credit_amt = None
+                    for row in table[1:]:
+                        row_dict = dict(zip(headers, row))
 
-                    head = classify_transaction(particulars)
+                        date = row_dict.get("date")
+                        particulars = row_dict.get("particulars")
+                        debit = row_dict.get("debit")
+                        credit = row_dict.get("credit")
+                        balance = row_dict.get("balance")
 
-                    transactions.append({
-                        "Date": date.strip(),
-                        "Particulars": particulars.strip(),
-                        "Debit": debit_amt,
-                        "Credit": credit_amt,
-                        "Head": head,
-                        "Balance": balance.strip() if balance else None
-                    })
+                        if not (date and particulars):
+                            continue
+
+                        # Clean amounts
+                        try:
+                            debit_amt = float(debit.replace(",", "")) if debit else None
+                        except:
+                            debit_amt = None
+
+                        try:
+                            credit_amt = float(credit.replace(",", "")) if credit else None
+                        except:
+                            credit_amt = None
+
+                        head = classify_transaction(particulars)
+
+                        transactions.append({
+                            "Date": date.strip(),
+                            "Particulars": particulars.strip(),
+                            "Debit": debit_amt,
+                            "Credit": credit_amt,
+                            "Head": head,
+                            "Balance": balance.strip() if balance else None
+                        })
 
             except Exception as e:
-                print("Error extracting table:", e)
+                print("Error extracting page:", e)
                 continue
 
     return meta, transactions
-
