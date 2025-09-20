@@ -1,0 +1,1 @@
+python bank_statement_extractor.py my_statement.pdf
