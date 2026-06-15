@@ -117,6 +117,36 @@ def classify_head(particulars):
         return "LIC"
     if any(kw in p for kw in ["TAX REFUND", "TAXREFUND"]):
         return "TAX REFUND"
+    if any(kw in p for kw in ["CHETANCHAMPAKLALGHEEWALA"]):
+        return "CHETAN CHAMPAKLAL GHEEWALA"
+    if any(kw in p for kw in ["HINDTOOS"]):
+        return "HIND TOOS"
+    if any(kw in p for kw in ["INDIANATECHNICALCERAMICS"]):
+        return "INDIANA TECHNICAL CERAMICS"
+    if any(kw in p for kw in ["J.P.PLASTIC"]):
+        return "J. P. PLASTIC"
+    if any(kw in p for kw in ["JAYAMBEENGINEERINGWORKS"]):
+        return "JAYAMBE ENGINEERING WORKS"
+    if any(kw in p for kw in ["MAHALAXMICERAMICS"]):
+        return "MAHALAXMI CERAMICS"
+    if any(kw in p for kw in ["MAHASHIVTEXTILEINDUSTRIES"]):
+        return "MAHASHIV TEXTILE INDUSTRIES"
+    if any(kw in p for kw in ["NEOPLASTICS"]):
+        return "NEO PLASTICS"
+    if any(kw in p for kw in ["OMTECHNOPLASTENGI", "OMTECHNOPLASTENGINEERING"]):
+        return "OM TECHNO PLAST ENGINEERING"
+    if any(kw in p for kw in ["RAJENDRAKUMARDALPATRAMCHAUHAN"]):
+        return "RAJENDRAKUMAR DALPATRAM CHAUHAN"
+    if any(kw in p for kw in ["SHREESAIKRUPAELECT", "SHREESAIKRUPAELECTROPLATING"]):
+        return "SHREE SAI KRUPA ELECTRO PLATING"
+    if any(kw in p for kw in ["VAISHNAVIMANUFACTURINGANDMARKETI"]):
+        return "VAISHNAVI MANUFACTURINGAND MARKETING"
+    if any(kw in p for kw in ["XXXX0301"]):
+        return "0301"
+    if any(kw in p for kw in ["XXXX0954"]):
+        return "0954"
+    if any(kw in p for kw in ["XXXX3343"]):
+        return "3343"
 
     for head, kws in HEAD_RULES.items():
         for kw in kws:
